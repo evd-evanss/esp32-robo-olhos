@@ -6,3 +6,6 @@ build/
 *.bin
 *.elf
 *.map
+mobile/.gradle/
+mobile/**/build/
+mobile/local.properties

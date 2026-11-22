@@ -53,6 +53,25 @@ Alimente o ESP32 pelo USB. O botão BOOT da placa usa GPIO0; não é necessário
 3. Abra **http://192.168.4.1** no navegador — digite `http`, não `https`.
 4. Envie uma frase, personalize nome e preferência, escolha o ritmo ou corrija a emoção detectada.
 
+## Aplicativo Android por Bluetooth
+
+O módulo `mobile/` é um aplicativo Kotlin Multiplatform com Compose Multiplatform, MVI, Koin e módulos separados para design, comunicação e funcionalidade. O APK usa o microfone e o alto-falante do próprio celular:
+
+```text
+fala → reconhecimento Android → texto BLE → ESP32 → resposta BLE → voz Android
+```
+
+Grave primeiro o firmware Bluetooth desta mesma versão. No Android, instale o APK da página de Releases, permita **Dispositivos próximos** e **Microfone**, toque em **Procurar robô** e escolha `RoboOlhos-XXXX`. O reconhecimento tenta o idioma `pt-BR` e solicita operação offline, mas alguns aparelhos dependem do serviço de voz e de internet. O áudio nunca passa pelo ESP32.
+
+O ESP32-S3 suporta Bluetooth Low Energy, não Bluetooth Classic/A2DP. O app requer Android 8 ou posterior. O BLE inicial não usa pareamento: pessoas próximas com outro cliente compatível podem tentar controlar o robô. Veja o protocolo em `docs/bluetooth.md`.
+
+Para compilar o app:
+
+```sh
+cd mobile
+./gradlew :features:companion:allTests :app:assembleDebug
+```
+
 A senha é gerada na placa e preservada entre reinicializações. Não há senha pessoal embutida no código. O comando `/apagar` apaga a personalização, mas conserva a senha Wi-Fi. Quem estiver conectado à rede pode controlar e alterar a memória do robô; não existe login separado por usuário.
 
 ## Comandos e exemplos

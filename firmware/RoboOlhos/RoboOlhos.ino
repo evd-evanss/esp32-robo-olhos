@@ -7,6 +7,7 @@
 #include <Adafruit_SSD1306.h>
 #include "robot.h"
 #include "web_ui.h"
+#include "ble_transport.h"
 
 Adafruit_SSD1306 display(128,64,&Wire,-1);
 WebServer server(80);
@@ -186,16 +187,19 @@ void setup(){
   Wire.begin(8,9);Wire.setClock(400000);
   for(uint8_t addr=0x3c;addr<=0x3d;++addr){Wire.beginTransmission(addr);if(Wire.endTransmission()==0){oledReady=display.begin(SSD1306_SWITCHCAPVCC,addr,true,false);break;}}
   WiFi.mode(WIFI_AP);bool apReady=WiFi.softAP(apName.c_str(),apPassword.c_str(),1,false,2);
+  setupBluetooth(apName);
   setupWeb();robot.wake(millis());robot.lastDecay=millis();saveMood();
   delay(1000);
   Serial.println("\nROBO OLHOS — IA local. 115200 baud + Nova linha. /ajuda para comandos.");
   Serial.println("Rede: "+apName+" | Senha: "+apPassword+" | http://192.168.4.1");
+  Serial.println("Bluetooth LE: "+apName+" (use o app Robo Olhos)");
   if(!apReady)Serial.println("Falha ao iniciar Wi-Fi. A serial continua funcionando.");
   if(!oledReady)Serial.println("OLED nao encontrado; confira GPIO8/9, 3V3 e GND.");
   if(!memoryReady)Serial.println("NVS indisponivel: memoria apenas nesta sessao.");
 }
 void loop(){
   server.handleClient();
+  handleBluetooth();
   int batch=0;
   while(Serial.available()&&batch++<64){
     char c=Serial.read();
