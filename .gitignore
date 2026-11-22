@@ -9,3 +9,5 @@ build/
 mobile/.gradle/
 mobile/**/build/
 mobile/local.properties
+**/*.xcuserstate
+**/xcuserdata/
