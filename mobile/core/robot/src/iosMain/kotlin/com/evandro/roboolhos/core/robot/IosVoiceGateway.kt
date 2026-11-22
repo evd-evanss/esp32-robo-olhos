@@ -139,7 +139,12 @@ class IosVoiceGateway : VoiceGateway {
     }
     override fun speak(text: String) {
         if (text.isBlank()) return
-        stopListening(); synthesizer.stopSpeakingAtBoundary(AVSpeechBoundary.AVSpeechBoundaryImmediate)
+        stopListening()
+        synthesizer.stopSpeakingAtBoundary(AVSpeechBoundary.AVSpeechBoundaryImmediate)
+        val audioSession = AVAudioSession.sharedInstance()
+        audioSession.setCategory(AVAudioSessionCategoryPlayback, null)
+        audioSession.setMode(AVAudioSessionModeDefault, null)
+        audioSession.setActive(true, null)
         val utterance = AVSpeechUtterance.speechUtteranceWithString(text).apply {
             voice = AVSpeechSynthesisVoice.voiceWithLanguage("pt-BR")
             rate = AVSpeechUtteranceDefaultSpeechRate * .92f
