@@ -129,7 +129,9 @@ class AndroidRobotGateway(context: Context) : RobotGateway {
     private fun accept(bytes: ByteArray) {
         incoming.append(bytes.decodeToString())
         while ('\n' in incoming) {
-            val line = incoming.substringBefore('\n'); incoming.delete(0, incoming.indexOf('\n') + 1)
+            val end = incoming.indexOf("\n")
+            val line = incoming.substring(0, end)
+            incoming.delete(0, end + 1)
             runCatching { json.decodeFromString<RobotReply>(line) }.onSuccess { responseWaiter?.complete(it) }
                 .onFailure { responseWaiter?.completeExceptionally(IllegalStateException("Resposta inválida do robô.")) }
         }
