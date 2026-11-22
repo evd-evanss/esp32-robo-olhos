@@ -25,7 +25,7 @@ import platform.Foundation.NSNumber
 import platform.Foundation.dataWithBytes
 import platform.darwin.NSObject
 
-class IosRobotGateway : NSObject(), RobotGateway, CBCentralManagerDelegateProtocol, CBPeripheralDelegateProtocol {
+class IosRobotGateway : RobotGateway {
     private val serviceUuid = CBUUID.UUIDWithString("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
     private val rxUuid = CBUUID.UUIDWithString("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
     private val txUuid = CBUUID.UUIDWithString("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
@@ -38,6 +38,7 @@ class IosRobotGateway : NSObject(), RobotGateway, CBCentralManagerDelegateProtoc
     private val signals = mutableMapOf<String, Int>()
     private val mutex = Mutex()
     private val incoming = StringBuilder()
+    private val bluetoothDelegate = RobotBluetoothDelegate(this)
     private var nextId = 1L
     private lateinit var central: CBCentralManager
     private var peripheral: CBPeripheral? = null
@@ -47,7 +48,7 @@ class IosRobotGateway : NSObject(), RobotGateway, CBCentralManagerDelegateProtoc
     private var writeWaiter: CompletableDeferred<Unit>? = null
     private var responseWaiter: CompletableDeferred<RobotReply>? = null
 
-    init { central = CBCentralManager(this, null) }
+    init { central = CBCentralManager(bluetoothDelegate, null) }
 
     override suspend fun scan() {
         if (central.state != CBManagerStatePoweredOn) throw IllegalStateException("Ative o Bluetooth do iPhone.")
@@ -64,7 +65,7 @@ class IosRobotGateway : NSObject(), RobotGateway, CBCentralManagerDelegateProtoc
     override suspend fun connect(device: RobotDevice) {
         stopScan(); disconnect()
         val target = peripherals[device.id] ?: throw IllegalStateException("Procure o robô novamente.")
-        peripheral = target; target.delegate = this
+        peripheral = target; target.delegate = bluetoothDelegate
         mutableConnection.value = LinkState(LinkPhase.CONNECTING, "Conectando…", device.name)
         connectWaiter = CompletableDeferred()
         central.connectPeripheral(target, null)
@@ -92,37 +93,35 @@ class IosRobotGateway : NSObject(), RobotGateway, CBCentralManagerDelegateProtoc
         }
     }
 
-    override fun centralManagerDidUpdateState(central: CBCentralManager) {
+    internal fun onCentralStateUpdated(central: CBCentralManager) {
         if (central.state != CBManagerStatePoweredOn && mutableConnection.value.phase != LinkPhase.DISCONNECTED) {
             mutableConnection.value = LinkState(detail = "Bluetooth indisponível")
         }
     }
-    override fun centralManager(central: CBCentralManager, didDiscoverPeripheral: CBPeripheral, advertisementData: Map<Any?, *>, RSSI: NSNumber) {
+    internal fun onPeripheralDiscovered(didDiscoverPeripheral: CBPeripheral, RSSI: NSNumber) {
         val name = didDiscoverPeripheral.name ?: return
         if (!name.startsWith("RoboOlhos")) return
         val id = didDiscoverPeripheral.identifier.UUIDString
         peripherals[id] = didDiscoverPeripheral; signals[id] = RSSI.intValue
         mutableDevices.value = peripherals.map { (key, value) -> RobotDevice(key, value.name ?: "RoboOlhos", signals[key] ?: 0) }
     }
-    override fun centralManager(central: CBCentralManager, didConnectPeripheral: CBPeripheral) {
-        didConnectPeripheral.delegate = this
+    internal fun onPeripheralConnected(didConnectPeripheral: CBPeripheral) {
+        didConnectPeripheral.delegate = bluetoothDelegate
         didConnectPeripheral.discoverServices(listOf(serviceUuid))
         mutableConnection.value = LinkState(LinkPhase.CONNECTING, "Configurando comunicação…", didConnectPeripheral.name ?: "RoboOlhos")
     }
-    @ObjCSignatureOverride
-    override fun centralManager(central: CBCentralManager, didFailToConnectPeripheral: CBPeripheral, error: NSError?) = failConnect(error?.localizedDescription ?: "Não foi possível conectar.")
-    @ObjCSignatureOverride
-    override fun centralManager(central: CBCentralManager, didDisconnectPeripheral: CBPeripheral, error: NSError?) {
+    internal fun onPeripheralConnectionFailed(error: NSError?) = failConnect(error?.localizedDescription ?: "Não foi possível conectar.")
+    internal fun onPeripheralDisconnected(error: NSError?) {
         failPending("Robô desconectado."); rx = null; tx = null
         mutableConnection.value = LinkState(detail = "Robô desconectado")
     }
-    override fun peripheral(peripheral: CBPeripheral, didDiscoverServices: NSError?) {
+    internal fun onServicesDiscovered(peripheral: CBPeripheral, didDiscoverServices: NSError?) {
         if (didDiscoverServices != null) return failConnect(didDiscoverServices.localizedDescription)
         val service = peripheral.services?.filterIsInstance<CBService>()?.firstOrNull { it.UUID == serviceUuid }
             ?: return failConnect("Firmware Bluetooth não encontrado. Atualize o ESP32.")
         peripheral.discoverCharacteristics(listOf(rxUuid, txUuid), service)
     }
-    override fun peripheral(peripheral: CBPeripheral, didDiscoverCharacteristicsForService: CBService, error: NSError?) {
+    internal fun onCharacteristicsDiscovered(peripheral: CBPeripheral, didDiscoverCharacteristicsForService: CBService, error: NSError?) {
         if (error != null) return failConnect(error.localizedDescription)
         didDiscoverCharacteristicsForService.characteristics?.filterIsInstance<CBCharacteristic>()?.forEach {
             if (it.UUID == rxUuid) rx = it
@@ -132,18 +131,15 @@ class IosRobotGateway : NSObject(), RobotGateway, CBCentralManagerDelegateProtoc
         if (rx == null) return failConnect("Canal de envio não encontrado.")
         peripheral.setNotifyValue(true, output)
     }
-    @ObjCSignatureOverride
-    override fun peripheral(peripheral: CBPeripheral, didUpdateNotificationStateForCharacteristic: CBCharacteristic, error: NSError?) {
+    internal fun onNotificationStateUpdated(peripheral: CBPeripheral, didUpdateNotificationStateForCharacteristic: CBCharacteristic, error: NSError?) {
         if (error != null || !didUpdateNotificationStateForCharacteristic.isNotifying) return failConnect(error?.localizedDescription ?: "Não foi possível ativar as respostas.")
         mutableConnection.value = LinkState(LinkPhase.READY, "Pronto para conversar", peripheral.name ?: "RoboOlhos")
         connectWaiter?.complete(Unit)
     }
-    @ObjCSignatureOverride
-    override fun peripheral(peripheral: CBPeripheral, didWriteValueForCharacteristic: CBCharacteristic, error: NSError?) {
+    internal fun onValueWritten(error: NSError?) {
         if (error == null) writeWaiter?.complete(Unit) else writeWaiter?.completeExceptionally(IllegalStateException(error.localizedDescription))
     }
-    @ObjCSignatureOverride
-    override fun peripheral(peripheral: CBPeripheral, didUpdateValueForCharacteristic: CBCharacteristic, error: NSError?) {
+    internal fun onValueUpdated(didUpdateValueForCharacteristic: CBCharacteristic, error: NSError?) {
         if (error != null) return responseWaiter?.completeExceptionally(IllegalStateException(error.localizedDescription)).let { Unit }
         accept(didUpdateValueForCharacteristic.value?.toByteArray() ?: return)
     }
@@ -168,4 +164,65 @@ class IosRobotGateway : NSObject(), RobotGateway, CBCentralManagerDelegateProtoc
         NSData.dataWithBytes(bytes = pinned.addressOf(0), length = size.convert())
     }
     private fun NSData.toByteArray(): ByteArray = bytes?.reinterpret<ByteVar>()?.readBytes(length.toInt()) ?: byteArrayOf()
+}
+
+private class RobotBluetoothDelegate(
+    private val gateway: IosRobotGateway,
+) : NSObject(), CBCentralManagerDelegateProtocol, CBPeripheralDelegateProtocol {
+    override fun centralManagerDidUpdateState(central: CBCentralManager) =
+        gateway.onCentralStateUpdated(central)
+
+    override fun centralManager(
+        central: CBCentralManager,
+        didDiscoverPeripheral: CBPeripheral,
+        advertisementData: Map<Any?, *>,
+        RSSI: NSNumber,
+    ) = gateway.onPeripheralDiscovered(didDiscoverPeripheral, RSSI)
+
+    override fun centralManager(central: CBCentralManager, didConnectPeripheral: CBPeripheral) =
+        gateway.onPeripheralConnected(didConnectPeripheral)
+
+    @ObjCSignatureOverride
+    override fun centralManager(
+        central: CBCentralManager,
+        didFailToConnectPeripheral: CBPeripheral,
+        error: NSError?,
+    ) = gateway.onPeripheralConnectionFailed(error)
+
+    @ObjCSignatureOverride
+    override fun centralManager(
+        central: CBCentralManager,
+        didDisconnectPeripheral: CBPeripheral,
+        error: NSError?,
+    ) = gateway.onPeripheralDisconnected(error)
+
+    override fun peripheral(peripheral: CBPeripheral, didDiscoverServices: NSError?) =
+        gateway.onServicesDiscovered(peripheral, didDiscoverServices)
+
+    override fun peripheral(
+        peripheral: CBPeripheral,
+        didDiscoverCharacteristicsForService: CBService,
+        error: NSError?,
+    ) = gateway.onCharacteristicsDiscovered(peripheral, didDiscoverCharacteristicsForService, error)
+
+    @ObjCSignatureOverride
+    override fun peripheral(
+        peripheral: CBPeripheral,
+        didUpdateNotificationStateForCharacteristic: CBCharacteristic,
+        error: NSError?,
+    ) = gateway.onNotificationStateUpdated(peripheral, didUpdateNotificationStateForCharacteristic, error)
+
+    @ObjCSignatureOverride
+    override fun peripheral(
+        peripheral: CBPeripheral,
+        didWriteValueForCharacteristic: CBCharacteristic,
+        error: NSError?,
+    ) = gateway.onValueWritten(error)
+
+    @ObjCSignatureOverride
+    override fun peripheral(
+        peripheral: CBPeripheral,
+        didUpdateValueForCharacteristic: CBCharacteristic,
+        error: NSError?,
+    ) = gateway.onValueUpdated(didUpdateValueForCharacteristic, error)
 }
