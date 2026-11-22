@@ -1,7 +1,7 @@
 #pragma once
 
-// Hardware wired according to the project schematic.
-#define ROBO_AUDIO_ENABLED 1
+// Keep disabled until the optional INMP441 and MAX98357A are installed.
+#define ROBO_AUDIO_ENABLED 0
 
 // Shared I2S clocks. These pins are free on the ESP32-S3 N16R8 board used here.
 #define ROBO_I2S_BCLK 16
