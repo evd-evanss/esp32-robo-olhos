@@ -155,12 +155,20 @@ void drawEyes(uint32_t now) {
     int bounce=f==HAPPY?(int)(pulse*2):f==SAD?2:0;
     int y=32-h/2+bounce;
     int width=f==SURPRISE?34:36;
-    display.fillRoundRect(x,y,width,h,min(10,h/2),SSD1306_WHITE);
+    if(f==HAPPY && close<.55f) {
+      // Two thick rising crescents: a much clearer smile using eyes only.
+      int centerX=x+width/2, centerY=35+bounce;
+      display.fillCircle(centerX,centerY,20,SSD1306_WHITE);
+      display.fillCircle(centerX,centerY+10,17,SSD1306_BLACK);
+      display.fillRect(centerX-22,centerY+8,44,18,SSD1306_BLACK);
+    } else {
+      display.fillRoundRect(x,y,width,h,min(10,h/2),SSD1306_WHITE);
+    }
     if(h>12 && close<.35f){
       int cut=abs((int)brow);
       bool inside=brow>0;
       if(cut>0){bool right=(side==0)==inside;display.fillTriangle(x,y,x+width-1,y,right?x+width-1:x,y+min(cut,h-4),SSD1306_BLACK);}
-      if(smile>.05f)display.fillCircle(x+width/2,y+h+14-(int)(smile*10),21,SSD1306_BLACK);
+      if(smile>.05f && f!=HAPPY)display.fillCircle(x+width/2,y+h+14-(int)(smile*10),21,SSD1306_BLACK);
     }
   }
   display.display();
