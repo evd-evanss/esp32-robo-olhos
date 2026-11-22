@@ -65,6 +65,10 @@ Grave primeiro o firmware Bluetooth desta mesma versão. No Android, instale o A
 
 O ESP32-S3 suporta Bluetooth Low Energy, não Bluetooth Classic/A2DP. O app requer Android 8 ou posterior. O BLE inicial não usa pareamento: pessoas próximas com outro cliente compatível podem tentar controlar o robô. Veja o protocolo em `docs/bluetooth.md`.
 
+### Testar no iPhone
+
+O módulo `mobile/iosApp` abre a mesma interface KMP e usa CoreBluetooth, Speech e AVFoundation. Abra `mobile/iosApp/RoboOlhos.xcodeproj`, selecione sua equipe de assinatura e execute em um iPhone com iOS 16 ou posterior. O simulador não é adequado para validar a conexão BLE com o robô. As instruções completas estão em `mobile/iosApp/README.md`.
+
 Para compilar o app:
 
 ```sh
