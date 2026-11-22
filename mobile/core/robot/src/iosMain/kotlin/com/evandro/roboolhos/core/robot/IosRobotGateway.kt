@@ -3,6 +3,7 @@
 package com.evandro.roboolhos.core.robot
 
 import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.readBytes
@@ -21,6 +22,7 @@ import platform.CoreBluetooth.*
 import platform.Foundation.NSData
 import platform.Foundation.NSError
 import platform.Foundation.NSNumber
+import platform.Foundation.dataWithBytes
 import platform.darwin.NSObject
 
 class IosRobotGateway : NSObject(), RobotGateway, CBCentralManagerDelegateProtocol, CBPeripheralDelegateProtocol {
@@ -107,7 +109,9 @@ class IosRobotGateway : NSObject(), RobotGateway, CBCentralManagerDelegateProtoc
         didConnectPeripheral.discoverServices(listOf(serviceUuid))
         mutableConnection.value = LinkState(LinkPhase.CONNECTING, "Configurando comunicação…", didConnectPeripheral.name ?: "RoboOlhos")
     }
+    @ObjCSignatureOverride
     override fun centralManager(central: CBCentralManager, didFailToConnectPeripheral: CBPeripheral, error: NSError?) = failConnect(error?.localizedDescription ?: "Não foi possível conectar.")
+    @ObjCSignatureOverride
     override fun centralManager(central: CBCentralManager, didDisconnectPeripheral: CBPeripheral, error: NSError?) {
         failPending("Robô desconectado."); rx = null; tx = null
         mutableConnection.value = LinkState(detail = "Robô desconectado")
@@ -128,14 +132,17 @@ class IosRobotGateway : NSObject(), RobotGateway, CBCentralManagerDelegateProtoc
         if (rx == null) return failConnect("Canal de envio não encontrado.")
         peripheral.setNotifyValue(true, output)
     }
+    @ObjCSignatureOverride
     override fun peripheral(peripheral: CBPeripheral, didUpdateNotificationStateForCharacteristic: CBCharacteristic, error: NSError?) {
         if (error != null || !didUpdateNotificationStateForCharacteristic.isNotifying) return failConnect(error?.localizedDescription ?: "Não foi possível ativar as respostas.")
         mutableConnection.value = LinkState(LinkPhase.READY, "Pronto para conversar", peripheral.name ?: "RoboOlhos")
         connectWaiter?.complete(Unit)
     }
+    @ObjCSignatureOverride
     override fun peripheral(peripheral: CBPeripheral, didWriteValueForCharacteristic: CBCharacteristic, error: NSError?) {
         if (error == null) writeWaiter?.complete(Unit) else writeWaiter?.completeExceptionally(IllegalStateException(error.localizedDescription))
     }
+    @ObjCSignatureOverride
     override fun peripheral(peripheral: CBPeripheral, didUpdateValueForCharacteristic: CBCharacteristic, error: NSError?) {
         if (error != null) return responseWaiter?.completeExceptionally(IllegalStateException(error.localizedDescription)).let { Unit }
         accept(didUpdateValueForCharacteristic.value?.toByteArray() ?: return)
@@ -145,7 +152,10 @@ class IosRobotGateway : NSObject(), RobotGateway, CBCentralManagerDelegateProtoc
         incoming.append(bytes.decodeToString())
         while ('\n' in incoming) {
             val end = incoming.indexOf("\n")
-            val line = incoming.substring(0, end); incoming.delete(0, end + 1)
+            val line = incoming.substring(0, end)
+            val remainder = incoming.substring(end + 1)
+            incoming.clear()
+            incoming.append(remainder)
             runCatching { json.decodeFromString<RobotReply>(line) }
                 .onSuccess { responseWaiter?.complete(it) }
                 .onFailure { responseWaiter?.completeExceptionally(IllegalStateException("Resposta inválida do robô.")) }
@@ -154,6 +164,8 @@ class IosRobotGateway : NSObject(), RobotGateway, CBCentralManagerDelegateProtoc
     }
     private fun failConnect(message: String) { connectWaiter?.completeExceptionally(IllegalStateException(message)); mutableConnection.value = LinkState(detail = message) }
     private fun failPending(message: String) { val error = IllegalStateException(message); connectWaiter?.completeExceptionally(error); writeWaiter?.completeExceptionally(error); responseWaiter?.completeExceptionally(error) }
-    private fun ByteArray.toNSData(): NSData = usePinned { NSData.create(bytes = it.addressOf(0), length = size.convert()) }
+    private fun ByteArray.toNSData(): NSData = usePinned { pinned ->
+        NSData.dataWithBytes(bytes = pinned.addressOf(0), length = size.convert())
+    }
     private fun NSData.toByteArray(): ByteArray = bytes?.reinterpret<ByteVar>()?.readBytes(length.toInt()) ?: byteArrayOf()
 }

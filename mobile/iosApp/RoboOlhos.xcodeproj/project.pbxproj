@@ -7,16 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-        8A0A2B622C08E8D700000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8A0A2B632C08E8D700000001 /* Assets.xcassets */; };
-		8A0A2B552C08E8D700000001 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 8A0A2B572C08E8D700000001 /* InfoPlist.strings */; };
 		8A0A2B542C08E8D700000001 /* RoboOlhosApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0A2B532C08E8D700000001 /* RoboOlhosApp.swift */; };
+		8A0A2B552C08E8D700000001 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 8A0A2B572C08E8D700000001 /* InfoPlist.strings */; };
+		8A0A2B622C08E8D700000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8A0A2B632C08E8D700000001 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-        8A0A2B632C08E8D700000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8A0A2B4E2C08E8D700000001 /* RoboOlhos.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RoboOlhos.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8A0A2B532C08E8D700000001 /* RoboOlhosApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoboOlhosApp.swift; sourceTree = "<group>"; };
-		8A0A2B562C08E8D700000001 /* InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		8A0A2B562C08E8D700000001 /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		8A0A2B632C08E8D700000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,23 +51,12 @@
 			children = (
 				8A0A2B532C08E8D700000001 /* RoboOlhosApp.swift */,
 				8A0A2B572C08E8D700000001 /* InfoPlist.strings */,
-                8A0A2B632C08E8D700000001 /* Assets.xcassets */,
+				8A0A2B632C08E8D700000001 /* Assets.xcassets */,
 			);
 			path = RoboOlhos;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
-
-/* Begin PBXVariantGroup section */
-        8A0A2B572C08E8D700000001 /* InfoPlist.strings */ = {
-            isa = PBXVariantGroup;
-            children = (
-                8A0A2B562C08E8D700000001 /* pt-BR */,
-            );
-            name = InfoPlist.strings;
-            sourceTree = "<group>";
-        };
-/* End PBXVariantGroup section */
 
 /* Begin PBXNativeTarget section */
 		8A0A2B4D2C08E8D700000001 /* RoboOlhos */ = {
@@ -127,7 +116,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8A0A2B552C08E8D700000001 /* InfoPlist.strings in Resources */,
-                8A0A2B622C08E8D700000001 /* Assets.xcassets in Resources */,
+				8A0A2B622C08E8D700000001 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -165,6 +154,17 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		8A0A2B572C08E8D700000001 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				8A0A2B562C08E8D700000001 /* pt-BR */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		8A0A2B592C08E8D700000001 /* Debug */ = {
@@ -292,11 +292,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-                "EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 28W4NGZ8SW;
 				ENABLE_PREVIEWS = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/../app/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
@@ -326,11 +326,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-                "EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 28W4NGZ8SW;
 				ENABLE_PREVIEWS = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/../app/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",

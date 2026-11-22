@@ -24,7 +24,7 @@ class IosVoiceGateway : VoiceGateway {
 
     init {
         SFSpeechRecognizer.requestAuthorization { status ->
-            val available = status == SFSpeechRecognizerAuthorizationStatusAuthorized
+            val available = status == SFSpeechRecognizerAuthorizationStatus.SFSpeechRecognizerAuthorizationStatusAuthorized
             mutableState.value = mutableState.value.copy(
                 available = available,
                 detail = if (available) "Toque para falar" else "Autorize o reconhecimento de voz nos Ajustes",
@@ -80,7 +80,7 @@ class IosVoiceGateway : VoiceGateway {
     }
     override fun speak(text: String) {
         if (text.isBlank()) return
-        stopListening(); synthesizer.stopSpeakingAtBoundary(AVSpeechBoundaryImmediate)
+        stopListening(); synthesizer.stopSpeakingAtBoundary(AVSpeechBoundary.AVSpeechBoundaryImmediate)
         val utterance = AVSpeechUtterance.speechUtteranceWithString(text).apply {
             voice = AVSpeechSynthesisVoice.voiceWithLanguage("pt-BR")
             rate = AVSpeechUtteranceDefaultSpeechRate * .92f
@@ -89,7 +89,7 @@ class IosVoiceGateway : VoiceGateway {
         synthesizer.speakUtterance(utterance)
     }
     override fun stopSpeaking() {
-        synthesizer.stopSpeakingAtBoundary(AVSpeechBoundaryImmediate)
+        synthesizer.stopSpeakingAtBoundary(AVSpeechBoundary.AVSpeechBoundaryImmediate)
         mutableState.value = mutableState.value.copy(speaking = false, detail = "Toque para falar")
     }
     override fun close() { stopListening(); stopSpeaking() }
