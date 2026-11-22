@@ -1,6 +1,6 @@
 # Robô Olhos — ESP32-S3
 
-Dois olhos animados em um OLED, com reações a frases em português, humor, memória e controle pelo celular. Funciona no próprio ESP32, sem internet, serviço pago, microfone ou alto-falante.
+Dois olhos animados em um OLED, com reações a frases em português, humor, memória e controle pelo celular. O cérebro textual funciona no próprio ESP32. Microfone e alto-falante I2S são opcionais e não alteram a personalidade ou a memória.
 
 **É um classificador de emoções com respostas programadas, não um chatbot generativo.** O modelo Naive Bayes foi treinado no computador com 252 exemplos sintéticos e 562 características. A inferência acontece na placa. Ele identifica `feliz`, `triste`, `raiva` e `neutro`; frases desconhecidas ou ambíguas podem resultar em neutro. Não interpreta linguagem de forma geral nem faz avaliação psicológica.
 
@@ -30,6 +30,32 @@ Desligue a alimentação antes de conectar:
 | VCC / VDD | 3V3 |
 | SCL / SCK | GPIO9 |
 | SDA | GPIO8 |
+
+### Áudio autônomo opcional
+
+O firmware possui uma camada I2S full-duplex para **INMP441 + MAX98357A**. Os dois módulos compartilham relógio e seleção de canal:
+
+| INMP441 | ESP32-S3 |
+|---|---|
+| VDD | 3V3 |
+| GND | GND |
+| SCK | GPIO16 |
+| WS | GPIO17 |
+| SD | GPIO18 |
+| L/R | GND |
+
+| MAX98357A | ESP32-S3 |
+|---|---|
+| VIN | 5V |
+| GND | GND |
+| BCLK | GPIO16 |
+| LRC | GPIO17 |
+| DIN | GPIO21 |
+| SPK+ / SPK- | Alto-falante 4 Ω / 3 W diretamente; nenhum terminal do alto-falante vai ao GND |
+
+Antes de ligar, confira as marcações do seu módulo. Para habilitar, altere `ROBO_AUDIO_ENABLED` para `1` em `audio_config.h`. Ao iniciar, o microfone calibra o ruído ambiente por 1,5 segundo. A fala detectada coloca os olhos no estado `ouvindo`. Use `/audio` para diagnóstico e `/som` para testar o amplificador.
+
+Essa camada captura e reproduz áudio, mas não inventa suporte inexistente: a biblioteca oficial ESP-SR não oferece transcrição livre offline em português nem TTS português. Enquanto um backend de voz não estiver configurado, a conversa livre continua entrando como texto pelo aplicativo, BLE, Serial ou página web. O cérebro, as respostas aprendidas e as expressões continuam no ESP32 e serão reutilizados pela futura entrada de voz.
 
 Alimente o ESP32 pelo USB. O botão BOOT da placa usa GPIO0; não é necessário botão externo. Os pinos e o endereço do display estão em `firmware/RoboOlhos/RoboOlhos.ino`.
 
@@ -101,6 +127,8 @@ Digite e pressione Enter no Monitor Serial ou envie na página:
 | `/dormir` | Coloca em sono; outra interação acorda |
 | `/demo` | Percorre as expressões; uma mensagem encerra |
 | `/wifi` | Mostra rede, senha e endereço |
+| `/audio` | Mostra estado e nível do microfone I2S |
+| `/som` | Reproduz dois tons para testar MAX98357A e alto-falante |
 | `/apagar` | Apaga nome, preferência, correções e humor |
 | `/ajuda` | Lista os comandos |
 
@@ -111,7 +139,7 @@ Com a placa já ligada, um toque curto em **BOOT** acorda ou troca o humor. Segu
 ## Como funciona
 
 ```text
-Serial / página web → comandos ou texto
+Serial / página web / aplicativo → comandos ou texto
                          ↓
               correção salva para a frase?
                 sim ↓             ↓ não
@@ -163,12 +191,14 @@ A versão anterior dos olhos e do classificador foi testada pelo usuário na pla
 - `robot.h`: estados, botão e correções.
 - `classifier.h` e `model.h`: inferência e pesos.
 - `web_ui.h`: interface embarcada, sem recursos externos.
+- `audio_config.h`: habilitação e pinos do INMP441/MAX98357A.
+- `audio_io.h`: I2S full-duplex, nível do microfone, detecção de voz e saída de áudio.
 - `tools/train_model.py`: dados sintéticos e treinamento reproduzível.
 - `tests/test_robot.cpp`: regressões executáveis no computador.
 
 ## Limitações
 
-O conjunto de treino é pequeno: ironia, frases longas, emoções misturadas e negações complexas podem falhar. As respostas são escolhidas de listas fixas. A preferência guardada personaliza algumas respostas, sem compreensão livre. O aparelho não aprende sozinho ao conversar. PSRAM não é necessária para este classificador. Não há áudio nesta versão.
+O conjunto de treino é pequeno: ironia, frases longas, emoções misturadas e negações complexas podem falhar. As respostas são escolhidas de listas fixas ou ensinadas pelo usuário. A preferência guardada personaliza algumas respostas, sem compreensão livre. O aparelho não aprende sozinho ao conversar. PSRAM não é necessária para este classificador. A camada I2S não inclui transcrição livre nem síntese de voz portuguesa dentro do ESP32.
 
 ## Licença
 

@@ -6,6 +6,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include "robot.h"
+#include "audio_io.h"
 #include "web_ui.h"
 #include "ble_transport.h"
 
@@ -13,6 +14,7 @@ Adafruit_SSD1306 display(128,64,&Wire,-1);
 WebServer server(80);
 Preferences prefs;
 Robot robot;
+RobotAudio audio;
 BootButton button;
 Lesson lessons[MAX_LESSONS] = {};
 Dialogue dialogues[MAX_DIALOGUES] = {};
@@ -87,6 +89,8 @@ String respond(const String& original) {
   uint32_t now=millis();robot.wake(now);robot.demo=false;
   if(text=="/ajuda")return "Converse normalmente ou ensine no app uma resposta e expressao. Comandos: /demo /neutro /surpresa /curioso /dormir /nome Ana /gosto musica /memoria /corrigir feliz|triste|raiva|neutro /apagar /wifi";
   if(text=="/wifi")return "Rede: "+apName+" | Senha: "+apPassword+" | Abra http://192.168.4.1";
+  if(text=="/audio")return audio.ready()?"Audio I2S ativo. Nivel: "+String(audio.level())+" | Ruido: "+String(audio.noiseFloor()):"Audio desativado. Ajuste ROBO_AUDIO_ENABLED para 1 em audio_config.h.";
+  if(text=="/som") {if(!audio.ready())return "Audio desativado.";robot.setInteraction(MODE_SPEAKING,now,700);audio.playTone(660,120);audio.playTone(880,160);return "Teste do alto-falante concluido.";}
   if(text.startsWith("/estado ")) {
     String value=text.substring(8);int selected=-1;for(int i=0;i<5;++i)if(value==INTERACTION_NAMES[i])selected=i;
     if(selected<0)return "Estado desconhecido.";
@@ -245,11 +249,13 @@ void setup(){
   for(uint8_t addr=0x3c;addr<=0x3d;++addr){Wire.beginTransmission(addr);if(Wire.endTransmission()==0){oledReady=display.begin(SSD1306_SWITCHCAPVCC,addr,true,false);break;}}
   WiFi.mode(WIFI_AP);bool apReady=WiFi.softAP(apName.c_str(),apPassword.c_str(),1,false,2);
   setupBluetooth(apName);
+  bool audioReady=audio.begin();
   setupWeb();robot.wake(millis());robot.lastDecay=millis();saveMood();
   delay(1000);
   Serial.println("\nROBO OLHOS — IA local. 115200 baud + Nova linha. /ajuda para comandos.");
   Serial.println("Rede: "+apName+" | Senha: "+apPassword+" | http://192.168.4.1");
   Serial.println("Bluetooth LE: "+apName+" (use o app Robo Olhos)");
+  Serial.println(audioReady?"Audio I2S: pronto":"Audio I2S: desativado ou indisponivel");
   if(!apReady)Serial.println("Falha ao iniciar Wi-Fi. A serial continua funcionando.");
   if(!oledReady)Serial.println("OLED nao encontrado; confira GPIO8/9, 3V3 e GND.");
   if(!memoryReady)Serial.println("NVS indisponivel: memoria apenas nesta sessao.");
@@ -257,6 +263,7 @@ void setup(){
 void loop(){
   server.handleClient();
   handleBluetooth();
+  audio.tick(robot,millis());
   int batch=0;
   while(Serial.available()&&batch++<64){
     char c=Serial.read();
