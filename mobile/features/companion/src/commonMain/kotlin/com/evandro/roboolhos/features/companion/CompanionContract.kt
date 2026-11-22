@@ -12,6 +12,7 @@ data class CompanionState(
     val messages: List<ChatMessage> = listOf(ChatMessage("Olá! Conecte o Robô Olhos e toque no microfone.", true)),
     val draft: String = "", val busy: Boolean = false, val soundEnabled: Boolean = true,
     val error: String? = null, val lastUserText: String = "",
+    val trainingPrompt: String = "", val trainingReply: String = "", val trainingFace: String = "feliz",
 )
 sealed interface CompanionIntent {
     data object Scan : CompanionIntent
@@ -23,5 +24,9 @@ sealed interface CompanionIntent {
     data object ToggleSound : CompanionIntent
     data class Command(val value: String) : CompanionIntent
     data class Correct(val emotion: String) : CompanionIntent
+    data class TrainingPromptChanged(val value: String) : CompanionIntent
+    data class TrainingReplyChanged(val value: String) : CompanionIntent
+    data class TrainingFaceChanged(val value: String) : CompanionIntent
+    data object TrainConversation : CompanionIntent
     data object DismissError : CompanionIntent
 }

@@ -4,6 +4,8 @@ Dois olhos animados em um OLED, com reações a frases em português, humor, mem
 
 **É um classificador de emoções com respostas programadas, não um chatbot generativo.** O modelo Naive Bayes foi treinado no computador com 252 exemplos sintéticos e 562 características. A inferência acontece na placa. Ele identifica `feliz`, `triste`, `raiva` e `neutro`; frases desconhecidas ou ambíguas podem resultar em neutro. Não interpreta linguagem de forma geral nem faz avaliação psicológica.
 
+O aplicativo também permite ensinar até 10 conversas pessoais: uma frase de exemplo, a resposta desejada e uma das sete expressões. A placa reconhece a mesma frase ou variações com pelo menos 60% das palavras relevantes em comum. Isso é memória associativa local, não geração livre de linguagem.
+
 ## O que faz
 
 - Desenha somente dois olhos preenchidos: felicidade, tristeza, raiva, surpresa, curiosidade e sono.

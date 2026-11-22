@@ -15,7 +15,9 @@ Preferences prefs;
 Robot robot;
 BootButton button;
 Lesson lessons[MAX_LESSONS] = {};
+Dialogue dialogues[MAX_DIALOGUES] = {};
 uint8_t lessonCount=0;
+uint8_t dialogueCount=0;
 bool memoryReady=false, oledReady=false, lively=false;
 String userName, interest, apName, apPassword, lastText;
 uint32_t frameAt=0, blinkAt=0, blinkStart=0, gazeAt=0;
@@ -54,8 +56,14 @@ void saveLessons() {
     else prefs.remove("lessons");
   }
 }
+void saveDialogues() {
+  if(memoryReady) {
+    if(dialogueCount) prefs.putBytes("dialogue",dialogues,sizeof(Dialogue)*dialogueCount);
+    else prefs.remove("dialogue");
+  }
+}
 String stateJson() {
-  return "{\"face\":"+jsonString(FACE_NAMES[robot.face()])+",\"mood\":"+jsonString(FACE_NAMES[robot.mood])+",\"name\":"+jsonString(userName)+",\"interest\":"+jsonString(interest)+",\"pace\":"+jsonString(lively?"animado":"calmo")+",\"demo\":"+(robot.demo?"true":"false")+",\"memory\":"+(memoryReady?"true":"false")+",\"lessons\":"+String(lessonCount)+"}";
+  return "{\"face\":"+jsonString(FACE_NAMES[robot.face()])+",\"mood\":"+jsonString(FACE_NAMES[robot.mood])+",\"name\":"+jsonString(userName)+",\"interest\":"+jsonString(interest)+",\"pace\":"+jsonString(lively?"animado":"calmo")+",\"demo\":"+(robot.demo?"true":"false")+",\"memory\":"+(memoryReady?"true":"false")+",\"lessons\":"+String(lessonCount)+",\"dialogues\":"+String(dialogueCount)+"}";
 }
 int labelIndex(const String& s) {
   for(int i=0;i<4;++i) if(s==NOMES[i]) return i;
@@ -77,7 +85,7 @@ String respond(const String& original) {
   if(text.isEmpty())return "Digite uma frase.";
   if(text.length()>240)return "Limite: 240 bytes por mensagem.";
   uint32_t now=millis();robot.wake(now);robot.demo=false;
-  if(text=="/ajuda")return "Frases: estou feliz / estou triste / estou com raiva. Comandos: /demo /neutro /surpresa /curioso /dormir /nome Ana /gosto musica /ritmo calmo /ritmo animado /memoria /corrigir feliz|triste|raiva|neutro /apagar /wifi";
+  if(text=="/ajuda")return "Converse normalmente ou ensine no app uma resposta e expressao. Comandos: /demo /neutro /surpresa /curioso /dormir /nome Ana /gosto musica /memoria /corrigir feliz|triste|raiva|neutro /apagar /wifi";
   if(text=="/wifi")return "Rede: "+apName+" | Senha: "+apPassword+" | Abra http://192.168.4.1";
   if(text=="/demo") {robot.demo=true;robot.demoFace=0;robot.lastDemo=now;return "Demonstracao ligada. Envie uma frase para sair.";}
   if(text=="/neutro") {robot.setMood(NEUTRAL,now);saveMood();return "De volta ao normal.";}
@@ -86,14 +94,25 @@ String respond(const String& original) {
   if(text.startsWith("/nome ")) {String v=text.substring(6);v.trim();if(!validField(v,24))return "Nome: ate 24 bytes, sem caracteres de controle.";userName=v;saveProfile();return "Combinado, "+userName+"!";}
   if(text.startsWith("/gosto ")) {String v=text.substring(7);v.trim();if(!validField(v,40))return "Preferencia: ate 40 bytes, sem caracteres de controle.";interest=v;saveProfile();return "Vou lembrar que voce gosta de "+interest+".";}
   if(text.startsWith("/ritmo ")) {String v=text.substring(7);if(v!="calmo" && v!="animado")return "Use /ritmo calmo ou /ritmo animado.";lively=v=="animado";saveProfile();return "Ritmo ajustado.";}
-  if(text=="/memoria")return "Nome: "+userName+" | Gosto: "+interest+" | Exemplos: "+String(lessonCount)+" | Humor: "+FACE_NAMES[robot.mood];
+  if(text=="/memoria")return "Nome: "+userName+" | Gosto: "+interest+" | Emocoes: "+String(lessonCount)+" | Conversas: "+String(dialogueCount)+" | Humor: "+FACE_NAMES[robot.mood];
+  if(text.startsWith("/ensinar|")) {
+    int a=text.indexOf('|',9),b=a<0?-1:text.indexOf('|',a+1);
+    if(a<0||b<0)return "Treino invalido. Use o formulario do app.";
+    String face=text.substring(9,a),prompt=text.substring(a+1,b),reply=text.substring(b+1); prompt.trim();reply.trim();
+    int chosen=-1;for(int i=0;i<7;++i)if(face==FACE_NAMES[i])chosen=i;
+    if(chosen<0||prompt.isEmpty()||prompt.length()>80||reply.isEmpty()||reply.length()>120||prompt.indexOf('|')>=0||reply.indexOf('|')>=0)return "Use pergunta ate 80, resposta ate 120 e sem o caractere |.";
+    if(!learnDialogue(dialogues,dialogueCount,prompt.c_str(),reply.c_str(),chosen))return "Nao consegui salvar esse treino.";
+    saveDialogues();robot.pose((Face)chosen,now);return "Aprendi. Vou usar essa resposta e expressao em frases parecidas.";
+  }
   if(text.startsWith("/corrigir "))return teachText(lastText,labelIndex(text.substring(10)));
   if(text=="/apagar") {
-    userName="";interest="";lively=false;lastText="";lessonCount=0;memset(lessons,0,sizeof(lessons));
-    robot.setMood(NEUTRAL,now);saveProfile();saveLessons();saveMood();return "Memoria pessoal apagada. A senha do Wi-Fi foi preservada.";
+    userName="";interest="";lively=false;lastText="";lessonCount=0;dialogueCount=0;memset(lessons,0,sizeof(lessons));memset(dialogues,0,sizeof(dialogues));
+    robot.setMood(NEUTRAL,now);saveProfile();saveLessons();saveDialogues();saveMood();return "Memoria pessoal apagada. A senha do Wi-Fi foi preservada.";
   }
   if(text.startsWith("/"))return "Comando desconhecido. Envie /ajuda.";
   lastText=text;
+  int dialogue=findDialogue(dialogues,dialogueCount,text.c_str());
+  if(dialogue>=0) {robot.pose((Face)dialogues[dialogue].face,now);return String(dialogues[dialogue].reply);}
   int label=rememberedLabel(lessons,lessonCount,text.c_str());
   bool remembered=label>=0;
   if(label<0)label=classificar(text.c_str()).classe;
@@ -121,22 +140,27 @@ void drawEyes(uint32_t now) {
   if(!blinking && now-blinkAt>(lively?2400u:4400u)) {blinking=true;blinkStart=now;blinkAt=now;}
   float close=0;
   if(blinking){uint32_t dt=now-blinkStart;if(dt>=220)blinking=false;else close=dt<110?dt/110.f:(220-dt)/110.f;}
-  float targetHeight=f==SLEEPY?7:f==SURPRISE?43:32;
+  float pulse=sinf(now*(f==SURPRISE?.012f:.004f));
+  float targetHeight=f==SLEEPY?6:f==SURPRISE?42+pulse*3:f==HAPPY?27:f==ANGRY?25:f==SAD?29:32;
   eyeHeight+=(targetHeight-eyeHeight)*.18f;
-  brow+=((f==ANGRY?17.f:f==SAD?-16.f:0)-brow)*.18f;
+  brow+=((f==ANGRY?19.f:f==SAD?-18.f:0)-brow)*.18f;
   smile+=((f==HAPPY?1.f:0)-smile)*.18f;
-  asymmetry+=((f==CURIOUS?12.f:0)-asymmetry)*.18f;
+  asymmetry+=((f==CURIOUS?15.f:0)-asymmetry)*.18f;
   display.clearDisplay();
   for(int side=0;side<2;++side){
-    int x=(side?72:20)+(int)gazeX;
+    int curiousShift=f==CURIOUS?(side?3:-3):0;
+    int angryShake=f==ANGRY?(int)(sinf(now*.025f+side)*1.5f):0;
+    int x=(side?72:20)+(int)gazeX+curiousShift+angryShake;
     int h=max(3,(int)((eyeHeight-(side?asymmetry:0))*(1-close)));
-    int y=32-h/2;
-    display.fillRoundRect(x,y,36,h,min(9,h/2),SSD1306_WHITE);
+    int bounce=f==HAPPY?(int)(pulse*2):f==SAD?2:0;
+    int y=32-h/2+bounce;
+    int width=f==SURPRISE?34:36;
+    display.fillRoundRect(x,y,width,h,min(10,h/2),SSD1306_WHITE);
     if(h>12 && close<.35f){
       int cut=abs((int)brow);
       bool inside=brow>0;
-      if(cut>0){bool right=(side==0)==inside;display.fillTriangle(x,y,x+35,y,right?x+35:x,y+min(cut,h-4),SSD1306_BLACK);}
-      if(smile>.05f)display.fillCircle(x+18,y+h+14-(int)(smile*10),21,SSD1306_BLACK);
+      if(cut>0){bool right=(side==0)==inside;display.fillTriangle(x,y,x+width-1,y,right?x+width-1:x,y+min(cut,h-4),SSD1306_BLACK);}
+      if(smile>.05f)display.fillCircle(x+width/2,y+h+14-(int)(smile*10),21,SSD1306_BLACK);
     }
   }
   display.display();
@@ -180,6 +204,8 @@ void setup(){
     if(m<3&&strength>0&&strength<=3){robot.mood=(Face)m;robot.intensity=strength;}
     size_t bytes=prefs.getBytesLength("lessons");
     if(bytes && bytes<=sizeof(lessons) && bytes%sizeof(Lesson)==0){prefs.getBytes("lessons",lessons,bytes);lessonCount=bytes/sizeof(Lesson);for(int i=0;i<lessonCount;++i){lessons[i].text[240]=0;if(lessons[i].label>3)lessons[i].label=3;}}
+    size_t dialogueBytes=prefs.getBytesLength("dialogue");
+    if(dialogueBytes && dialogueBytes<=sizeof(dialogues) && dialogueBytes%sizeof(Dialogue)==0){prefs.getBytes("dialogue",dialogues,dialogueBytes);dialogueCount=dialogueBytes/sizeof(Dialogue);for(int i=0;i<dialogueCount;++i){dialogues[i].prompt[80]=0;dialogues[i].reply[120]=0;if(dialogues[i].face>6)dialogues[i].face=3;}}
     apPassword=prefs.getString("ap-pass","");
   }
   if(apPassword.length()!=12){char pw[13];snprintf(pw,sizeof(pw),"%08lx%04lx",(unsigned long)esp_random(),(unsigned long)(esp_random()&0xffff));apPassword=pw;if(memoryReady)prefs.putString("ap-pass",apPassword);}

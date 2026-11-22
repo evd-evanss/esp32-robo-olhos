@@ -59,6 +59,7 @@ fun CompanionScreen(viewModel: CompanionViewModel) {
                 item { QuickActions(state.busy, viewModel::dispatch) }
                 item { ChatCard(state, viewModel::dispatch) }
                 if (state.lastUserText.isNotBlank()) item { CorrectionCard(viewModel::dispatch) }
+                item { TrainingCard(state, viewModel::dispatch) }
             }
         }
     }
@@ -66,6 +67,48 @@ fun CompanionScreen(viewModel: CompanionViewModel) {
         AlertDialog(onDismissRequest = { viewModel.dispatch(CompanionIntent.DismissError) }, confirmButton = {
             TextButton(onClick = { viewModel.dispatch(CompanionIntent.DismissError) }) { Text("Entendi") }
         }, title = { Text("Não foi possível continuar") }, text = { Text(error) })
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TrainingCard(state: CompanionState, dispatch: (CompanionIntent) -> Unit) {
+    val faces = listOf("feliz", "triste", "raiva", "neutro", "surpresa", "curioso", "sono")
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Ensinar uma conversa", style = MaterialTheme.typography.titleMedium)
+            Text("Defina o que você diz, como ele responde e a expressão que fará. Frases com palavras parecidas também serão reconhecidas.", color = MaterialTheme.colorScheme.secondary)
+            OutlinedTextField(
+                value = state.trainingPrompt,
+                onValueChange = { dispatch(CompanionIntent.TrainingPromptChanged(it)) },
+                label = { Text("Quando eu disser…") },
+                supportingText = { Text("${state.trainingPrompt.length}/80") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = state.trainingReply,
+                onValueChange = { dispatch(CompanionIntent.TrainingReplyChanged(it)) },
+                label = { Text("Responda…") },
+                supportingText = { Text("${state.trainingReply.length}/120") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text("Expressão", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                faces.forEach { face ->
+                    FilterChip(
+                        selected = state.trainingFace == face,
+                        onClick = { dispatch(CompanionIntent.TrainingFaceChanged(face)) },
+                        label = { Text(face.replaceFirstChar { it.uppercase() }) },
+                    )
+                }
+            }
+            Button(
+                onClick = { dispatch(CompanionIntent.TrainConversation) },
+                enabled = !state.busy && state.trainingPrompt.isNotBlank() && state.trainingReply.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Ensinar ao robô") }
+            Text("${state.robot.dialogues}/10 conversas salvas na placa", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        }
     }
 }
 

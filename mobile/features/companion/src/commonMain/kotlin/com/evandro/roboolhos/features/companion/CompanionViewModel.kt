@@ -45,7 +45,36 @@ class CompanionViewModel(private val robotGateway: RobotGateway, private val voi
             CompanionIntent.ToggleSound -> mutableState.update { it.copy(soundEnabled = !it.soundEnabled) }
             is CompanionIntent.Command -> send(intent.value)
             is CompanionIntent.Correct -> send("/corrigir ${intent.emotion}")
+            is CompanionIntent.TrainingPromptChanged -> mutableState.update { it.copy(trainingPrompt = intent.value.take(80).replace("|", "")) }
+            is CompanionIntent.TrainingReplyChanged -> mutableState.update { it.copy(trainingReply = intent.value.take(120).replace("|", "")) }
+            is CompanionIntent.TrainingFaceChanged -> mutableState.update { it.copy(trainingFace = intent.value) }
+            CompanionIntent.TrainConversation -> trainConversation()
             CompanionIntent.DismissError -> mutableState.update { it.copy(error = null) }
+        }
+    }
+
+    private fun trainConversation() {
+        val snapshot = state.value
+        val prompt = snapshot.trainingPrompt.trim()
+        val reply = snapshot.trainingReply.trim()
+        if (prompt.isEmpty() || reply.isEmpty() || snapshot.busy) return
+        viewModelScope.launch {
+            mutableState.update { it.copy(busy = true) }
+            try {
+                val result = robotGateway.send("/ensinar|${snapshot.trainingFace}|$prompt|$reply")
+                if (result.error != null) throw IllegalStateException(result.error)
+                mutableState.update {
+                    it.copy(
+                        robot = result.state,
+                        trainingPrompt = "",
+                        trainingReply = "",
+                        messages = (it.messages + ChatMessage(result.reply, true)).takeLast(40),
+                    )
+                }
+                if (result.reply.isNotBlank() && state.value.soundEnabled) voiceGateway.speak(result.reply)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Throwable) { mutableState.update { it.copy(error = error.message ?: "Não foi possível ensinar.") } }
+            finally { mutableState.update { it.copy(busy = false) } }
         }
     }
 

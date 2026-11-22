@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 data class RobotState(
     val face: String = "neutro", val mood: String = "neutro", val name: String = "",
     val interest: String = "", val pace: String = "calmo", val demo: Boolean = false,
-    val memory: Boolean = true, val lessons: Int = 0,
+    val memory: Boolean = true, val lessons: Int = 0, val dialogues: Int = 0,
 )
 @Serializable
 data class RobotReply(val id: Long, val reply: String = "", val state: RobotState = RobotState(), val error: String? = null)
