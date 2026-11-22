@@ -1,0 +1,15 @@
+name: Logic tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check reproducible model
+        run: |
+          python3 tools/train_model.py
+          git diff --exit-code -- firmware/RoboOlhos/model.h
+      - name: Test logic with sanitizers
+        run: |
+          g++ -std=c++11 -fsanitize=address,undefined -g tests/test_robot.cpp -o /tmp/test-robo
+          /tmp/test-robo
