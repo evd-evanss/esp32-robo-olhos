@@ -6,12 +6,15 @@
 
 enum Face : uint8_t { HAPPY, SAD, ANGRY, NEUTRAL, SURPRISE, CURIOUS, SLEEPY };
 const char* const FACE_NAMES[] = {"feliz","triste","raiva","neutro","surpresa","curioso","sono"};
+enum Interaction : uint8_t { MODE_IDLE, MODE_LISTENING, MODE_THINKING, MODE_SPEAKING, MODE_REACTING };
+const char* const INTERACTION_NAMES[] = {"normal","ouvindo","pensando","falando","reagindo"};
 constexpr uint32_t SLEEP_AFTER=45000, MOOD_DECAY=30000;
 struct Robot {
   Face mood=NEUTRAL, overrideFace=NEUTRAL;
+  Interaction interaction=MODE_IDLE;
   uint8_t intensity=0;
   bool demo=false, sleeping=false;
-  uint32_t lastActivity=0, lastDecay=0, overrideUntil=0, lastDemo=0;
+  uint32_t lastActivity=0, lastDecay=0, overrideUntil=0, interactionUntil=0, lastDemo=0;
   uint8_t demoFace=0;
   bool hasOverride=false;
   void wake(uint32_t now) { sleeping=false; lastActivity=now; }
@@ -22,15 +25,24 @@ struct Robot {
     lastDecay=now;
   }
   void pose(Face f,uint32_t now) { wake(now); demo=false; hasOverride=true; overrideFace=f; overrideUntil=now+2500; }
+  void setInteraction(Interaction value,uint32_t now,uint32_t duration=0) {
+    wake(now); interaction=value; interactionUntil=duration?now+duration:0;
+  }
   void tick(uint32_t now) {
     if (hasOverride && (int32_t)(now-overrideUntil)>=0) hasOverride=false;
+    if (interaction!=MODE_IDLE && interactionUntil && (int32_t)(now-interactionUntil)>=0) interaction=MODE_IDLE;
     if (intensity && now-lastDecay>=MOOD_DECAY) {
       lastDecay=now; --intensity; if (!intensity) mood=NEUTRAL;
     }
     if (demo && now-lastDemo>=2500) { lastDemo=now; demoFace=(demoFace+1)%7; }
     sleeping=!demo && now-lastActivity>=SLEEP_AFTER;
   }
-  Face face() const { return demo ? (Face)demoFace : sleeping ? SLEEPY : hasOverride ? overrideFace : mood; }
+  Face face() const {
+    if (demo) return (Face)demoFace;
+    if (sleeping) return SLEEPY;
+    if (interaction==MODE_LISTENING || interaction==MODE_THINKING) return CURIOUS;
+    return hasOverride ? overrideFace : mood;
+  }
 };
 // Debounce and one event per press. A long press never emits a short press.
 struct BootButton {

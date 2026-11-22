@@ -20,8 +20,8 @@ uint8_t lessonCount=0;
 uint8_t dialogueCount=0;
 bool memoryReady=false, oledReady=false, lively=false;
 String userName, interest, apName, apPassword, lastText;
-uint32_t frameAt=0, blinkAt=0, blinkStart=0, gazeAt=0;
-bool blinking=false;
+uint32_t frameAt=0, blinkAt=0, blinkStart=0, gazeAt=0, nextBlink=3200, nextGaze=3200;
+bool blinking=false,doubleBlinkPending=false;
 float gazeX=0, gazeTarget=0, eyeHeight=32, brow=0, smile=0, asymmetry=0;
 char serialLine[241] = {};
 size_t serialLength=0;
@@ -63,7 +63,7 @@ void saveDialogues() {
   }
 }
 String stateJson() {
-  return "{\"face\":"+jsonString(FACE_NAMES[robot.face()])+",\"mood\":"+jsonString(FACE_NAMES[robot.mood])+",\"name\":"+jsonString(userName)+",\"interest\":"+jsonString(interest)+",\"pace\":"+jsonString(lively?"animado":"calmo")+",\"demo\":"+(robot.demo?"true":"false")+",\"memory\":"+(memoryReady?"true":"false")+",\"lessons\":"+String(lessonCount)+",\"dialogues\":"+String(dialogueCount)+"}";
+  return "{\"face\":"+jsonString(FACE_NAMES[robot.face()])+",\"mood\":"+jsonString(FACE_NAMES[robot.mood])+",\"interaction\":"+jsonString(INTERACTION_NAMES[robot.interaction])+",\"name\":"+jsonString(userName)+",\"interest\":"+jsonString(interest)+",\"pace\":"+jsonString(lively?"animado":"calmo")+",\"demo\":"+(robot.demo?"true":"false")+",\"memory\":"+(memoryReady?"true":"false")+",\"lessons\":"+String(lessonCount)+",\"dialogues\":"+String(dialogueCount)+"}";
 }
 int labelIndex(const String& s) {
   for(int i=0;i<4;++i) if(s==NOMES[i]) return i;
@@ -87,6 +87,12 @@ String respond(const String& original) {
   uint32_t now=millis();robot.wake(now);robot.demo=false;
   if(text=="/ajuda")return "Converse normalmente ou ensine no app uma resposta e expressao. Comandos: /demo /neutro /surpresa /curioso /dormir /nome Ana /gosto musica /memoria /corrigir feliz|triste|raiva|neutro /apagar /wifi";
   if(text=="/wifi")return "Rede: "+apName+" | Senha: "+apPassword+" | Abra http://192.168.4.1";
+  if(text.startsWith("/estado ")) {
+    String value=text.substring(8);int selected=-1;for(int i=0;i<5;++i)if(value==INTERACTION_NAMES[i])selected=i;
+    if(selected<0)return "Estado desconhecido.";
+    uint32_t duration=selected==MODE_LISTENING?10000:selected==MODE_THINKING?12000:selected==MODE_SPEAKING?6000:selected==MODE_REACTING?3000:0;
+    robot.setInteraction((Interaction)selected,now,duration);return "";
+  }
   if(text=="/demo") {robot.demo=true;robot.demoFace=0;robot.lastDemo=now;return "Demonstracao ligada. Envie uma frase para sair.";}
   if(text=="/neutro") {robot.setMood(NEUTRAL,now);saveMood();return "De volta ao normal.";}
   if(text=="/surpresa" || text=="/curioso") {robot.pose(text=="/surpresa"?SURPRISE:CURIOUS,now);return "Olha minha expressao!";}
@@ -112,13 +118,14 @@ String respond(const String& original) {
   if(text.startsWith("/"))return "Comando desconhecido. Envie /ajuda.";
   lastText=text;
   int dialogue=findDialogue(dialogues,dialogueCount,text.c_str());
-  if(dialogue>=0) {robot.pose((Face)dialogues[dialogue].face,now);return String(dialogues[dialogue].reply);}
+  if(dialogue>=0) {robot.setInteraction(MODE_REACTING,now,3000);robot.pose((Face)dialogues[dialogue].face,now);return String(dialogues[dialogue].reply);}
   int label=rememberedLabel(lessons,lessonCount,text.c_str());
   bool remembered=label>=0;
   if(label<0)label=classificar(text.c_str()).classe;
   // Neutral text wakes the robot without immediately erasing its accumulated mood.
   if(label<3)robot.setMood((Face)label,now);
   else robot.pose(CURIOUS,now);
+  robot.setInteraction(MODE_REACTING,now,3000);
   saveMood();
   const char* const answers[4][3]={
     {"Que bom! Vamos comemorar!","Gostei dessa energia!","Fico contente por voce!"},
@@ -135,24 +142,40 @@ String respond(const String& original) {
 void drawEyes(uint32_t now) {
   if(!oledReady || now-frameAt<33)return;frameAt=now;
   Face f=robot.face();
-  if(now-gazeAt>(lively?1700u:3600u)) {gazeAt=now;gazeTarget=(f==SLEEPY?0:(int)random(-5,6));}
+  Interaction interaction=robot.interaction;
+  if(interaction==MODE_LISTENING) gazeTarget=0;
+  else if(interaction==MODE_THINKING) gazeTarget=((now/650)%2)?-7:7;
+  else if(now-gazeAt>nextGaze) {gazeAt=now;nextGaze=random(lively?1200:2600,lively?2400:4600);gazeTarget=(f==SLEEPY?0:(int)random(-7,8));}
   gazeX+=(gazeTarget-gazeX)*.14f;
-  if(!blinking && now-blinkAt>(lively?2400u:4400u)) {blinking=true;blinkStart=now;blinkAt=now;}
+  if(!blinking && now-blinkAt>nextBlink) {blinking=true;blinkStart=now;blinkAt=now;}
   float close=0;
-  if(blinking){uint32_t dt=now-blinkStart;if(dt>=220)blinking=false;else close=dt<110?dt/110.f:(220-dt)/110.f;}
+  if(blinking){
+    uint32_t dt=now-blinkStart;
+    if(dt>=180){
+      blinking=false;blinkAt=now;
+      if(doubleBlinkPending){doubleBlinkPending=false;nextBlink=random(lively?1800:2800,lively?3200:5200);}
+      else if(random(0,5)==0){doubleBlinkPending=true;nextBlink=150;}
+      else nextBlink=random(lively?1800:2800,lively?3200:5200);
+    } else close=dt<90?dt/90.f:(180-dt)/90.f;
+  }
   float pulse=sinf(now*(f==SURPRISE?.012f:.004f));
+  float voicePulse=interaction==MODE_SPEAKING?sinf(now*.018f)*5:0;
+  float listenPulse=interaction==MODE_LISTENING?sinf(now*.009f)*4:0;
   float targetHeight=f==SLEEPY?6:f==SURPRISE?42+pulse*3:f==HAPPY?27:f==ANGRY?25:f==SAD?29:32;
+  targetHeight+=voicePulse+listenPulse;
   eyeHeight+=(targetHeight-eyeHeight)*.18f;
   brow+=((f==ANGRY?19.f:f==SAD?-18.f:0)-brow)*.18f;
   smile+=((f==HAPPY?1.f:0)-smile)*.18f;
-  asymmetry+=((f==CURIOUS?15.f:0)-asymmetry)*.18f;
+  float thinkingAsymmetry=interaction==MODE_THINKING?(((now/650)%2)?14.f:-14.f):0;
+  asymmetry+=((f==CURIOUS?15.f:0)+thinkingAsymmetry-asymmetry)*.18f;
   display.clearDisplay();
   for(int side=0;side<2;++side){
     int curiousShift=f==CURIOUS?(side?3:-3):0;
+    if(interaction==MODE_LISTENING) curiousShift+=(int)(sinf(now*.009f)*(side?2:-2));
     int angryShake=f==ANGRY?(int)(sinf(now*.025f+side)*1.5f):0;
     int x=(side?72:20)+(int)gazeX+curiousShift+angryShake;
     int h=max(3,(int)((eyeHeight-(side?asymmetry:0))*(1-close)));
-    int bounce=f==HAPPY?(int)(pulse*2):f==SAD?2:0;
+    int bounce=f==HAPPY?(int)(pulse*(interaction==MODE_REACTING?4:2)):f==SAD?2:interaction==MODE_SPEAKING?(int)(sinf(now*.018f)*2):0;
     int y=32-h/2+bounce;
     int width=f==SURPRISE?34:36;
     if(f==HAPPY && close<.55f) {

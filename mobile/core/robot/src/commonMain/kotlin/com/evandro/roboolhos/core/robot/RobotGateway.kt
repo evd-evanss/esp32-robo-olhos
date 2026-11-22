@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class RobotState(
-    val face: String = "neutro", val mood: String = "neutro", val name: String = "",
+    val face: String = "neutro", val mood: String = "neutro", val interaction: String = "normal", val name: String = "",
     val interest: String = "", val pace: String = "calmo", val demo: Boolean = false,
     val memory: Boolean = true, val lessons: Int = 0, val dialogues: Int = 0,
 )
@@ -23,6 +23,7 @@ interface RobotGateway {
     suspend fun connect(device: RobotDevice)
     fun disconnect()
     suspend fun send(text: String): RobotReply
+    suspend fun signal(interaction: String) { send("/estado $interaction") }
 }
 
 data class VoiceState(val listening: Boolean = false, val speaking: Boolean = false, val detail: String = "Toque para falar", val available: Boolean = true)

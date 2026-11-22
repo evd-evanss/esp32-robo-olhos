@@ -71,8 +71,8 @@ class AndroidRobotGateway(context: Context) : RobotGateway {
             val output = tx ?: return failConnect("Canal de resposta não encontrado.")
             g.setCharacteristicNotification(output, true)
             val descriptor = output.getDescriptor(CCCD) ?: return failConnect("Notificações não disponíveis.")
-            if (Build.VERSION.SDK_INT >= 33) g.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE)
-            else { @Suppress("DEPRECATION") descriptor.value = BluetoothGattDescriptor.ENABLE_INDICATION_VALUE; @Suppress("DEPRECATION") g.writeDescriptor(descriptor) }
+            if (Build.VERSION.SDK_INT >= 33) g.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+            else { @Suppress("DEPRECATION") descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE; @Suppress("DEPRECATION") g.writeDescriptor(descriptor) }
         }
         override fun onDescriptorWrite(g: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS) {

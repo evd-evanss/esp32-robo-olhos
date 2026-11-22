@@ -6,6 +6,8 @@ Dois olhos animados em um OLED, com reações a frases em português, humor, mem
 
 O aplicativo também permite ensinar até 10 conversas pessoais: uma frase de exemplo, a resposta desejada e uma das sete expressões. A placa reconhece a mesma frase ou variações com pelo menos 60% das palavras relevantes em comum. Isso é memória associativa local, não geração livre de linguagem.
 
+O motor visual é uma implementação original MIT inspirada nos princípios de animação de projetos como FluxGarage RoboEyes e Stack-chan. Ele não incorpora código desses projetos: usa transições próprias, piscar simples ou duplo, olhar ocioso e estados sincronizados de `ouvindo`, `pensando`, `falando`, `reagindo` e `dormindo`.
+
 ## O que faz
 
 - Desenha somente dois olhos preenchidos: felicidade, tristeza, raiva, surpresa, curiosidade e sono.

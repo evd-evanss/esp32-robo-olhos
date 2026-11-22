@@ -25,7 +25,10 @@ class CompanionViewModel(private val robotGateway: RobotGateway, private val voi
             voiceGateway.events.collect { event ->
                 when (event) {
                     is VoiceEvent.Recognized -> { mutableState.update { it.copy(draft = event.text) }; send(event.text) }
-                    is VoiceEvent.Error -> mutableState.update { it.copy(error = event.message) }
+                    is VoiceEvent.Error -> {
+                        runCatching { robotGateway.signal("normal") }
+                        mutableState.update { it.copy(error = event.message) }
+                    }
                 }
             }
         }
@@ -40,7 +43,7 @@ class CompanionViewModel(private val robotGateway: RobotGateway, private val voi
             CompanionIntent.Send -> send(state.value.draft)
             CompanionIntent.Listen -> viewModelScope.launch {
                 voiceGateway.stopSpeaking()
-                runAction { voiceGateway.listen() }
+                runAction { robotGateway.signal("ouvindo"); voiceGateway.listen() }
             }
             CompanionIntent.ToggleSound -> mutableState.update { it.copy(soundEnabled = !it.soundEnabled) }
             is CompanionIntent.Command -> send(intent.value)
@@ -71,7 +74,10 @@ class CompanionViewModel(private val robotGateway: RobotGateway, private val voi
                         messages = (it.messages + ChatMessage(result.reply, true)).takeLast(40),
                     )
                 }
-                if (result.reply.isNotBlank() && state.value.soundEnabled) voiceGateway.speak(result.reply)
+                if (result.reply.isNotBlank() && state.value.soundEnabled) {
+                    robotGateway.signal("falando")
+                    voiceGateway.speak(result.reply)
+                }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Throwable) { mutableState.update { it.copy(error = error.message ?: "Não foi possível ensinar.") } }
             finally { mutableState.update { it.copy(busy = false) } }
@@ -85,10 +91,14 @@ class CompanionViewModel(private val robotGateway: RobotGateway, private val voi
         viewModelScope.launch {
             mutableState.update { it.copy(busy = true, draft = "", lastUserText = if (text.startsWith('/')) it.lastUserText else text, messages = (it.messages + ChatMessage(text, false)).takeLast(40)) }
             try {
+                if (!text.startsWith('/')) robotGateway.signal("pensando")
                 val reply = robotGateway.send(text)
                 if (reply.error != null) throw IllegalStateException(reply.error)
                 mutableState.update { it.copy(robot = reply.state, messages = if (reply.reply.isBlank()) it.messages else (it.messages + ChatMessage(reply.reply, true)).takeLast(40)) }
-                if (reply.reply.isNotBlank() && state.value.soundEnabled) voiceGateway.speak(reply.reply.substringBefore(" ["))
+                if (reply.reply.isNotBlank() && state.value.soundEnabled) {
+                    robotGateway.signal("falando")
+                    voiceGateway.speak(reply.reply.substringBefore(" ["))
+                }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Throwable) { mutableState.update { it.copy(error = error.message ?: "Falha na comunicação Bluetooth.") } }
             finally { mutableState.update { it.copy(busy = false) } }
