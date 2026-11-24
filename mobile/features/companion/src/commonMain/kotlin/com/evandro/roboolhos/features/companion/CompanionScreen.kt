@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -76,7 +77,7 @@ private fun AppHeader(state: CompanionState, dispatch: (CompanionIntent) -> Unit
         actions = {
             ConnectionDot(state.link.phase); Spacer(Modifier.width(8.dp))
             IconButton({ dispatch(CompanionIntent.ToggleSound) }, Modifier.background(Color.White.copy(alpha = .07f), CircleShape)) {
-                Icon(if (state.soundEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff, if (state.soundEnabled) "Desativar voz" else "Ativar voz")
+                Icon(if (state.soundEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff, if (state.soundEnabled) "Desativar voz" else "Ativar voz")
             }
             Spacer(Modifier.width(8.dp))
         },
@@ -144,11 +145,11 @@ private fun RobotEyes(face: String) {
 
 @Composable
 private fun ConnectionPanel(state: CompanionState, dispatch: (CompanionIntent) -> Unit) = GlassPanel {
-    Icon(Icons.Default.BluetoothSearching, null, tint = Mint, modifier = Modifier.size(28.dp)); Spacer(Modifier.height(10.dp))
+    Icon(Icons.AutoMirrored.Filled.BluetoothSearching, null, tint = Mint, modifier = Modifier.size(28.dp)); Spacer(Modifier.height(10.dp))
     Text("Conecte seu Robô Olhos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
     Text("Ligue a placa e encontre o dispositivo por Bluetooth.", color = MaterialTheme.colorScheme.secondary); Spacer(Modifier.height(12.dp))
     Button({ dispatch(CompanionIntent.Scan) }, enabled = state.link.phase != LinkPhase.SCANNING, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(16.dp)) {
-        if (state.link.phase == LinkPhase.SCANNING) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Icon(Icons.Default.BluetoothSearching, null)
+        if (state.link.phase == LinkPhase.SCANNING) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Icon(Icons.AutoMirrored.Filled.BluetoothSearching, null)
         Spacer(Modifier.width(8.dp)); Text(if (state.link.phase == LinkPhase.SCANNING) "Procurando…" else "Procurar robô")
     }
     state.devices.forEach { device ->
@@ -156,7 +157,7 @@ private fun ConnectionPanel(state: CompanionState, dispatch: (CompanionIntent) -
             Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.DeveloperBoard, null, tint = Mint); Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) { Text(device.name, fontWeight = FontWeight.Medium); Text("Sinal ${device.signal} dBm", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
-                Icon(Icons.Default.ChevronRight, null)
+                Icon(Icons.AutoMirrored.Filled.ChevronRight, null)
             }
         }
     }

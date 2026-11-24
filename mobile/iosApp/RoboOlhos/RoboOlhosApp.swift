@@ -25,7 +25,6 @@ private struct ComposeRootView: UIViewControllerRepresentable {
                 intelligence.respond(to: prompt) { reply, emotion in
                     completion(reply, emotion)
                 }
-                return KotlinUnit()
             }
         )
     }
