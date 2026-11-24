@@ -10,6 +10,7 @@ import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,16 +46,20 @@ class IosRobotGateway : RobotGateway {
     private var rx: CBCharacteristic? = null
     private var tx: CBCharacteristic? = null
     private var connectWaiter: CompletableDeferred<Unit>? = null
+    private var bluetoothReadyWaiter: CompletableDeferred<Unit>? = null
     private var writeWaiter: CompletableDeferred<Unit>? = null
     private var responseWaiter: CompletableDeferred<RobotReply>? = null
 
     init { central = CBCentralManager(bluetoothDelegate, null) }
 
     override suspend fun scan() {
-        if (central.state != CBManagerStatePoweredOn) throw IllegalStateException("Ative o Bluetooth do iPhone.")
+        awaitBluetooth()
         stopScan(); peripherals.clear(); signals.clear(); mutableDevices.value = emptyList()
         mutableConnection.value = LinkState(LinkPhase.SCANNING, "Procurando RoboOlhos…")
-        central.scanForPeripheralsWithServices(listOf(serviceUuid), null)
+        // Scan broadly and validate the advertised name ourselves. Some ESP32
+        // stacks place the 128-bit service in the scan response, which iOS does
+        // not always match reliably when the scan starts immediately after boot.
+        central.scanForPeripheralsWithServices(null, null)
         delay(10_000)
         if (mutableConnection.value.phase == LinkPhase.SCANNING) {
             stopScan()
@@ -94,6 +99,10 @@ class IosRobotGateway : RobotGateway {
     }
 
     internal fun onCentralStateUpdated(central: CBCentralManager) {
+        if (central.state == CBManagerStatePoweredOn) {
+            bluetoothReadyWaiter?.complete(Unit)
+            return
+        }
         if (central.state != CBManagerStatePoweredOn && mutableConnection.value.phase != LinkPhase.DISCONNECTED) {
             mutableConnection.value = LinkState(detail = "Bluetooth indisponível")
         }
@@ -159,6 +168,17 @@ class IosRobotGateway : RobotGateway {
         if (incoming.length > 2048) { incoming.clear(); responseWaiter?.completeExceptionally(IllegalStateException("Resposta grande demais.")) }
     }
     private fun failConnect(message: String) { connectWaiter?.completeExceptionally(IllegalStateException(message)); mutableConnection.value = LinkState(detail = message) }
+    private suspend fun awaitBluetooth() {
+        if (central.state == CBManagerStatePoweredOn) return
+        bluetoothReadyWaiter = CompletableDeferred()
+        try {
+            withTimeout(5_000) { bluetoothReadyWaiter!!.await() }
+        } catch (_: TimeoutCancellationException) {
+            throw IllegalStateException("Ative o Bluetooth do iPhone e tente novamente.")
+        } finally {
+            bluetoothReadyWaiter = null
+        }
+    }
     private fun failPending(message: String) { val error = IllegalStateException(message); connectWaiter?.completeExceptionally(error); writeWaiter?.completeExceptionally(error); responseWaiter?.completeExceptionally(error) }
     private fun ByteArray.toNSData(): NSData = usePinned { pinned ->
         NSData.dataWithBytes(bytes = pinned.addressOf(0), length = size.convert())

@@ -60,9 +60,10 @@ void setupBluetooth(const String& deviceName) {
     bleServer = BLEDevice::createServer();
     bleServer->setCallbacks(new RobotBleServerCallbacks());
     BLEService* service = bleServer->createService(BLE_SERVICE_UUID);
-    // Notifications avoid waiting for an acknowledgement for every 20-byte
-    // fragment. The application already validates the request id and JSON line.
-    bleTx = service->createCharacteristic(BLE_TX_UUID, BLECharacteristic::PROPERTY_NOTIFY);
+    // Keep indications here. iOS caches the GATT shape by device/service UUID;
+    // changing this characteristic to notify-only can leave an existing phone
+    // unable to finish subscribing after a firmware update.
+    bleTx = service->createCharacteristic(BLE_TX_UUID, BLECharacteristic::PROPERTY_INDICATE);
     bleTx->addDescriptor(new BLE2902());
     BLECharacteristic* rx = service->createCharacteristic(BLE_RX_UUID, BLECharacteristic::PROPERTY_WRITE);
     rx->setCallbacks(new RobotBleInputCallbacks());
@@ -79,8 +80,8 @@ void sendBluetoothLine(const String& line) {
     for (size_t offset = 0; offset < line.length() && bleConnected; offset += 20) {
         size_t count = min((size_t)20, line.length() - offset);
         bleTx->setValue(bytes + offset, count);
-        bleTx->notify();
-        delay(2);
+        bleTx->indicate();
+        delay(8);
     }
 }
 
