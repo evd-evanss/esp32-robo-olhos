@@ -157,7 +157,7 @@ private fun ConnectionPanel(state: CompanionState, dispatch: (CompanionIntent) -
             Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.DeveloperBoard, null, tint = Mint); Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) { Text(device.name, fontWeight = FontWeight.Medium); Text("Sinal ${device.signal} dBm", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
-                Icon(Icons.AutoMirrored.Filled.ChevronRight, null)
+                Icon(Icons.Default.ChevronRight, null)
             }
         }
     }
