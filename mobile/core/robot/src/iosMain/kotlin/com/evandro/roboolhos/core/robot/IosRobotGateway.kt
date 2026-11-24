@@ -37,6 +37,7 @@ class IosRobotGateway : RobotGateway {
     override val devices: StateFlow<List<RobotDevice>> = mutableDevices
     private val peripherals = linkedMapOf<String, CBPeripheral>()
     private val signals = mutableMapOf<String, Int>()
+    private val names = mutableMapOf<String, String>()
     private val mutex = Mutex()
     private val incoming = StringBuilder()
     private val bluetoothDelegate = RobotBluetoothDelegate(this)
@@ -54,7 +55,7 @@ class IosRobotGateway : RobotGateway {
 
     override suspend fun scan() {
         awaitBluetooth()
-        stopScan(); peripherals.clear(); signals.clear(); mutableDevices.value = emptyList()
+        stopScan(); peripherals.clear(); signals.clear(); names.clear(); mutableDevices.value = emptyList()
         mutableConnection.value = LinkState(LinkPhase.SCANNING, "Procurando RoboOlhos…")
         // Scan broadly and validate the advertised name ourselves. Some ESP32
         // stacks place the 128-bit service in the scan response, which iOS does
@@ -107,12 +108,12 @@ class IosRobotGateway : RobotGateway {
             mutableConnection.value = LinkState(detail = "Bluetooth indisponível")
         }
     }
-    internal fun onPeripheralDiscovered(didDiscoverPeripheral: CBPeripheral, RSSI: NSNumber) {
-        val name = didDiscoverPeripheral.name ?: return
+    internal fun onPeripheralDiscovered(didDiscoverPeripheral: CBPeripheral, advertisedName: String?, RSSI: NSNumber) {
+        val name = advertisedName ?: didDiscoverPeripheral.name ?: return
         if (!name.startsWith("RoboOlhos")) return
         val id = didDiscoverPeripheral.identifier.UUIDString
-        peripherals[id] = didDiscoverPeripheral; signals[id] = RSSI.intValue
-        mutableDevices.value = peripherals.map { (key, value) -> RobotDevice(key, value.name ?: "RoboOlhos", signals[key] ?: 0) }
+        peripherals[id] = didDiscoverPeripheral; signals[id] = RSSI.intValue; names[id] = name
+        mutableDevices.value = peripherals.map { (key, _) -> RobotDevice(key, names[key] ?: "RoboOlhos", signals[key] ?: 0) }
     }
     internal fun onPeripheralConnected(didConnectPeripheral: CBPeripheral) {
         didConnectPeripheral.delegate = bluetoothDelegate
@@ -126,15 +127,15 @@ class IosRobotGateway : RobotGateway {
     }
     internal fun onServicesDiscovered(peripheral: CBPeripheral, didDiscoverServices: NSError?) {
         if (didDiscoverServices != null) return failConnect(didDiscoverServices.localizedDescription)
-        val service = peripheral.services?.filterIsInstance<CBService>()?.firstOrNull { it.UUID == serviceUuid }
+        val service = peripheral.services?.filterIsInstance<CBService>()?.firstOrNull { sameUuid(it.UUID, serviceUuid) }
             ?: return failConnect("Firmware Bluetooth não encontrado. Atualize o ESP32.")
         peripheral.discoverCharacteristics(listOf(rxUuid, txUuid), service)
     }
     internal fun onCharacteristicsDiscovered(peripheral: CBPeripheral, didDiscoverCharacteristicsForService: CBService, error: NSError?) {
         if (error != null) return failConnect(error.localizedDescription)
         didDiscoverCharacteristicsForService.characteristics?.filterIsInstance<CBCharacteristic>()?.forEach {
-            if (it.UUID == rxUuid) rx = it
-            if (it.UUID == txUuid) tx = it
+            if (sameUuid(it.UUID, rxUuid)) rx = it
+            if (sameUuid(it.UUID, txUuid)) tx = it
         }
         val output = tx ?: return failConnect("Canal de resposta não encontrado.")
         if (rx == null) return failConnect("Canal de envio não encontrado.")
@@ -168,6 +169,8 @@ class IosRobotGateway : RobotGateway {
         if (incoming.length > 2048) { incoming.clear(); responseWaiter?.completeExceptionally(IllegalStateException("Resposta grande demais.")) }
     }
     private fun failConnect(message: String) { connectWaiter?.completeExceptionally(IllegalStateException(message)); mutableConnection.value = LinkState(detail = message) }
+    private fun sameUuid(left: CBUUID, right: CBUUID): Boolean =
+        left.UUIDString.equals(right.UUIDString, ignoreCase = true)
     private suspend fun awaitBluetooth() {
         if (central.state == CBManagerStatePoweredOn) return
         bluetoothReadyWaiter = CompletableDeferred()
@@ -197,7 +200,11 @@ private class RobotBluetoothDelegate(
         didDiscoverPeripheral: CBPeripheral,
         advertisementData: Map<Any?, *>,
         RSSI: NSNumber,
-    ) = gateway.onPeripheralDiscovered(didDiscoverPeripheral, RSSI)
+    ) = gateway.onPeripheralDiscovered(
+        didDiscoverPeripheral,
+        advertisementData[CBAdvertisementDataLocalNameKey] as? String,
+        RSSI,
+    )
 
     override fun centralManager(central: CBCentralManager, didConnectPeripheral: CBPeripheral) =
         gateway.onPeripheralConnected(didConnectPeripheral)
