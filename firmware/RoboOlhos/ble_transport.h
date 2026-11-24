@@ -60,9 +60,6 @@ void setupBluetooth(const String& deviceName) {
     bleServer = BLEDevice::createServer();
     bleServer->setCallbacks(new RobotBleServerCallbacks());
     BLEService* service = bleServer->createService(BLE_SERVICE_UUID);
-    // Keep indications here. iOS caches the GATT shape by device/service UUID;
-    // changing this characteristic to notify-only can leave an existing phone
-    // unable to finish subscribing after a firmware update.
     bleTx = service->createCharacteristic(BLE_TX_UUID, BLECharacteristic::PROPERTY_INDICATE);
     bleTx->addDescriptor(new BLE2902());
     BLECharacteristic* rx = service->createCharacteristic(BLE_RX_UUID, BLECharacteristic::PROPERTY_WRITE);
