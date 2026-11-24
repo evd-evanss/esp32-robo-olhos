@@ -24,6 +24,7 @@ interface RobotGateway {
     fun disconnect()
     suspend fun send(text: String): RobotReply
     suspend fun signal(interaction: String) { send("/estado $interaction") }
+    suspend fun express(face: String) { send("/expressao $face") }
 }
 
 data class VoiceState(val listening: Boolean = false, val speaking: Boolean = false, val detail: String = "Toque para falar", val available: Boolean = true)

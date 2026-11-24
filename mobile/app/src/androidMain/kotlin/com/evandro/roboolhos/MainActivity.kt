@@ -8,6 +8,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import com.evandro.roboolhos.core.robot.AndroidRobotGateway
 import com.evandro.roboolhos.core.robot.AndroidVoiceGateway
+import com.evandro.roboolhos.core.robot.ConversationEngine
+import com.evandro.roboolhos.core.robot.EmbeddedFallbackEngine
 import com.evandro.roboolhos.core.robot.RobotGateway
 import com.evandro.roboolhos.core.robot.VoiceGateway
 import com.evandro.roboolhos.features.companion.CompanionViewModel
@@ -29,7 +31,8 @@ class MainActivity : ComponentActivity() {
                 modules(module {
                     single<RobotGateway> { robot }
                     single<VoiceGateway> { voice }
-                    factory { CompanionViewModel(get(), get()) }
+                    single<ConversationEngine> { EmbeddedFallbackEngine }
+                    factory { CompanionViewModel(get(), get(), get()) }
                 })
             }
         }

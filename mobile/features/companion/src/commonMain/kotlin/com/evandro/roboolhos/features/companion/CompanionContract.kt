@@ -13,6 +13,7 @@ data class CompanionState(
     val draft: String = "", val busy: Boolean = false, val soundEnabled: Boolean = true,
     val error: String? = null, val lastUserText: String = "",
     val trainingPrompt: String = "", val trainingReply: String = "", val trainingFace: String = "feliz",
+    val localAiAvailable: Boolean = false,
 )
 sealed interface CompanionIntent {
     data object Scan : CompanionIntent

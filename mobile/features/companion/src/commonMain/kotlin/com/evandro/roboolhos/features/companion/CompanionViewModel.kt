@@ -3,6 +3,8 @@ package com.evandro.roboolhos.features.companion
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.evandro.roboolhos.core.robot.LinkPhase
+import com.evandro.roboolhos.core.robot.ConversationEngine
+import com.evandro.roboolhos.core.robot.EmbeddedFallbackEngine
 import com.evandro.roboolhos.core.robot.RobotGateway
 import com.evandro.roboolhos.core.robot.VoiceEvent
 import com.evandro.roboolhos.core.robot.VoiceGateway
@@ -13,8 +15,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class CompanionViewModel(private val robotGateway: RobotGateway, private val voiceGateway: VoiceGateway) : ViewModel() {
-    private val mutableState = MutableStateFlow(CompanionState())
+class CompanionViewModel(
+    private val robotGateway: RobotGateway,
+    private val voiceGateway: VoiceGateway,
+    private val conversationEngine: ConversationEngine = EmbeddedFallbackEngine,
+) : ViewModel() {
+    private val mutableState = MutableStateFlow(CompanionState(localAiAvailable = conversationEngine.available))
     val state: StateFlow<CompanionState> = mutableState.asStateFlow()
 
     init {
@@ -92,12 +98,18 @@ class CompanionViewModel(private val robotGateway: RobotGateway, private val voi
             mutableState.update { it.copy(busy = true, draft = "", lastUserText = if (text.startsWith('/')) it.lastUserText else text, messages = (it.messages + ChatMessage(text, false)).takeLast(40)) }
             try {
                 if (!text.startsWith('/')) robotGateway.signal("pensando")
-                val reply = robotGateway.send(text)
-                if (reply.error != null) throw IllegalStateException(reply.error)
-                mutableState.update { it.copy(robot = reply.state, messages = if (reply.reply.isBlank()) it.messages else (it.messages + ChatMessage(reply.reply, true)).takeLast(40)) }
-                if (reply.reply.isNotBlank() && state.value.soundEnabled) {
+                val fallback = robotGateway.send(text)
+                if (fallback.error != null) throw IllegalStateException(fallback.error)
+                val generated = if (!text.startsWith('/') && conversationEngine.available) {
+                    runCatching { conversationEngine.respond(text, fallback.state) }.getOrNull()
+                } else null
+                if (generated != null) robotGateway.express(generated.emotion)
+                val replyText = generated?.text ?: fallback.reply
+                val robotState = generated?.let { fallback.state.copy(face = it.emotion) } ?: fallback.state
+                mutableState.update { it.copy(robot = robotState, messages = if (replyText.isBlank()) it.messages else (it.messages + ChatMessage(replyText, true)).takeLast(40)) }
+                if (replyText.isNotBlank() && state.value.soundEnabled) {
                     robotGateway.signal("falando")
-                    voiceGateway.speak(reply.reply.substringBefore(" ["))
+                    voiceGateway.speak(replyText.substringBefore(" ["))
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Throwable) { mutableState.update { it.copy(error = error.message ?: "Falha na comunicação Bluetooth.") } }

@@ -162,6 +162,11 @@ private fun QuickActions(busy: Boolean, dispatch: (CompanionIntent) -> Unit) {
 private fun ChatCard(state: CompanionState, dispatch: (CompanionIntent) -> Unit) {
     ElevatedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Conversa", style = MaterialTheme.typography.titleMedium)
+        Text(
+            if (state.localAiAvailable) "IA local do iPhone • conversa com contexto" else "Cérebro offline do ESP32 • respostas aprendidas",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (state.localAiAvailable) Mint else MaterialTheme.colorScheme.secondary,
+        )
         Column(Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 320.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             state.messages.takeLast(6).forEach { message ->
                 Box(Modifier.align(if (message.fromRobot) Alignment.Start else Alignment.End).background(if (message.fromRobot) MaterialTheme.colorScheme.surfaceVariant else Mint.copy(alpha = .2f), RoundedCornerShape(14.dp)).padding(12.dp)) { Text(message.text) }

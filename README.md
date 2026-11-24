@@ -99,6 +99,8 @@ O ESP32-S3 suporta Bluetooth Low Energy, não Bluetooth Classic/A2DP. O app requ
 
 O módulo `mobile/iosApp` abre a mesma interface KMP e usa CoreBluetooth, Speech e AVFoundation. Abra `mobile/iosApp/RoboOlhos.xcodeproj`, selecione sua equipe de assinatura e execute em um iPhone com iOS 16 ou posterior. O simulador não é adequado para validar a conexão BLE com o robô. As instruções completas estão em `mobile/iosApp/README.md`.
 
+Em iPhones compatíveis com Apple Intelligence e iOS 26 ou posterior, o aplicativo usa Foundation Models para conversar localmente, manter o contexto da sessão e escolher a expressão do ESP32. O texto não é enviado a um serviço de IA. Se o modelo local estiver desativado, ainda estiver sendo baixado, não suportar o aparelho/idioma ou falhar, o aplicativo usa automaticamente a resposta associativa produzida pelo próprio ESP32. A tela informa qual motor está ativo.
+
 Para compilar o app:
 
 ```sh

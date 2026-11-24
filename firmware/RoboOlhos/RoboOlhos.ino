@@ -97,6 +97,11 @@ String respond(const String& original) {
     uint32_t duration=selected==MODE_LISTENING?10000:selected==MODE_THINKING?12000:selected==MODE_SPEAKING?6000:selected==MODE_REACTING?3000:0;
     robot.setInteraction((Interaction)selected,now,duration);return "";
   }
+  if(text.startsWith("/expressao ")) {
+    String value=text.substring(11);int selected=-1;for(int i=0;i<7;++i)if(value==FACE_NAMES[i])selected=i;
+    if(selected<0)return "Expressao desconhecida.";
+    robot.setInteraction(MODE_REACTING,now,3500);robot.pose((Face)selected,now);return "";
+  }
   if(text=="/demo") {robot.demo=true;robot.demoFace=0;robot.lastDemo=now;return "Demonstracao ligada. Envie uma frase para sair.";}
   if(text=="/neutro") {robot.setMood(NEUTRAL,now);saveMood();return "De volta ao normal.";}
   if(text=="/surpresa" || text=="/curioso") {robot.pose(text=="/surpresa"?SURPRISE:CURIOUS,now);return "Olha minha expressao!";}

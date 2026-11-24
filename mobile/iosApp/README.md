@@ -2,6 +2,13 @@
 
 O shell SwiftUI abre a interface Compose compartilhada. Bluetooth, reconhecimento de fala e síntese de voz usam CoreBluetooth, Speech e AVFoundation no código `iosMain`.
 
+O aplicativo possui dois motores de conversa:
+
+- Em iOS 26+, quando Apple Intelligence está disponível, `FoundationModels` gera respostas localmente no iPhone, conserva o contexto da sessão e seleciona uma expressão para o display.
+- Nos demais aparelhos, ou quando a geração falha, o ESP32 responde com seu classificador e suas conversas aprendidas.
+
+Todas as mensagens continuam passando pelo ESP32, portanto humor, memória, aprendizado e expressões permanecem funcionais nos dois modos. Nenhuma chave de API é necessária.
+
 1. Grave no ESP32 o firmware Bluetooth atual deste repositório.
 2. Abra `RoboOlhos.xcodeproj` e selecione o scheme **RoboOlhos**.
 3. Em **Signing & Capabilities**, escolha sua equipe e confirme um Bundle Identifier disponível.
